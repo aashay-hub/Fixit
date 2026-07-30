@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#05080F">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>J.A.R.V.I.S</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ===================== DESIGN TOKENS ===================== */
+:root{
+  --bg:#05080F; --panel:rgba(10,16,28,0.68); --panel-border:rgba(76,224,230,0.22);
+  --cyan:#3DDCFF; --violet:#3DDCFF; --ember:#FF6B4A;
+  --text:#E8F4F8; --text-dim:#7C93A8;
+}
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body{ margin:0; padding:0; height:100%; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 25%, #0C1B34 0%, #060A14 50%, #020306 100%);
+  color:var(--text); font-family:'Inter',sans-serif; -webkit-user-select:none; user-select:none; }
+
+/* ===================== ATMOSPHERE LAYERS ===================== */
+.grid-overlay{ position:fixed; inset:0; pointer-events:none; opacity:0.14; z-index:1;
+  background-image:linear-gradient(rgba(76,224,230,0.4) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(76,224,230,0.4) 1px, transparent 1px);
+  background-size:40px 40px;
+  mask-image:radial-gradient(ellipse at 50% 35%, black 0%, transparent 72%); }
+
+.scanline{ position:fixed; left:0; right:0; height:2px; z-index:2; pointer-events:none;
+  background:linear-gradient(90deg, transparent, rgba(76,224,230,0.5), transparent);
+  animation:scanmove 5.5s linear infinite; opacity:0.5; }
+@keyframes scanmove{ 0%{ top:-2px; } 100%{ top:100%; } }
+
+.vignette{ position:fixed; inset:0; pointer-events:none; z-index:1;
+  box-shadow:inset 0 0 140px rgba(0,0,0,0.75); }
+
+/* ===================== CORNER HUD BRACKETS ===================== */
+.corner{ position:fixed; width:26px; height:26px; border:2px solid rgba(76,224,230,0.55); z-index:3; pointer-events:none; }
+.corner.tl{ top:14px; left:14px; border-right:none; border-bottom:none; }
+.corner.tr{ top:14px; right:14px; border-left:none; border-bottom:none; }
+.corner.bl{ bottom:14px; left:14px; border-right:none; border-top:none; }
+.corner.br{ bottom:14px; right:14px; border-left:none; border-top:none; }
+
+/* ===================== BOOT SEQUENCE ===================== */
+.boot-screen{ position:fixed; inset:0; background:#020306; z-index:100; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:22px; transition:opacity 0.6s ease, visibility 0.6s ease; }
+.boot-screen.hidden{ opacity:0; visibility:hidden; pointer-events:none; }
+.boot-word{ font-family:'Orbitron',sans-serif; font-weight:900; font-size:30px; letter-spacing:10px;
+  color:var(--cyan); text-shadow:0 0 24px rgba(76,224,230,0.8); animation:bootFlicker 1.8s ease-in-out infinite; }
+@keyframes bootFlicker{ 0%,100%{ opacity:1; } 48%{ opacity:1; } 50%{ opacity:0.4; } 52%{ opacity:1; } }
+.boot-bar-track{ width:220px; height:2px; background:rgba(76,224,230,0.15); border-radius:2px; overflow:hidden; }
+.boot-bar-fill{ height:100%; width:0%; background:linear-gradient(90deg,var(--cyan),var(--violet));
+  animation:bootFill 2.1s ease forwards; box-shadow:0 0 10px rgba(76,224,230,0.8); }
+@keyframes bootFill{ from{ width:0%; } to{ width:100%; } }
+.boot-status{ font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:2px; color:var(--text-dim); }
+
+/* ===================== LAYOUT ===================== */
+.app{ position:relative; z-index:4; height:100vh; display:flex; flex-direction:column;
+  padding:env(safe-area-inset-top,20px) 18px env(safe-area-inset-bottom,18px); }
+
+/* ===================== HUD CONSOLE HEADER ===================== */
+.hud-console{ border:1px solid var(--panel-border); background:linear-gradient(180deg, rgba(61,220,255,0.06), transparent 60%);
+  clip-path:polygon(0 0,100% 0,100% 82%,97% 100%,3% 100%,0 82%); padding:12px 14px 10px; }
+
+.console-row1{ display:flex; align-items:center; justify-content:space-between; }
+.brand{ display:flex; flex-direction:column; gap:2px; }
+.wordmark{ font-family:'Orbitron',sans-serif; font-weight:700; font-size:16px; letter-spacing:4px;
+  color:var(--cyan); text-shadow:0 0 14px rgba(61,220,255,0.7); }
+.tagline{ font-family:'JetBrains Mono',monospace; font-size:7.5px; letter-spacing:2.5px; color:rgba(124,147,168,0.65); }
+
+.status-chip{ display:flex; align-items:center; gap:6px; font-family:'JetBrains Mono',monospace;
+  font-size:9.5px; letter-spacing:1.5px; color:var(--text-dim); }
+.status-dot{ width:6px; height:6px; border-radius:50%; background:var(--cyan); box-shadow:0 0 8px var(--cyan);
+  animation:blink 2.4s ease-in-out infinite; }
+@keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+
+.console-divider{ height:1px; margin:10px 0; background:linear-gradient(90deg, transparent, rgba(61,220,255,0.45), transparent); }
+
+/* ===================== FLOATING ACTION DOCK ===================== */
+.action-dock{ display:flex; justify-content:center; gap:10px; padding-top:10px; }
+.dock-btn{ position:relative; overflow:hidden; display:flex; flex-direction:column; align-items:center; gap:4px;
+  width:76px; padding:10px 6px 8px; border:1px solid var(--panel-border); background:rgba(6,14,26,0.55);
+  clip-path:polygon(12% 0,88% 0,100% 30%,100% 100%,0 100%,0 30%);
+  color:var(--text-dim); transition:border-color 0.25s ease, box-shadow 0.25s ease, color 0.25s ease; }
+.dock-btn .dock-icon{ font-size:17px; line-height:1; }
+.dock-btn .dock-label{ font-family:'JetBrains Mono',monospace; font-size:7.5px; letter-spacing:1.5px; }
+.dock-btn:active{ color:var(--cyan); border-color:rgba(61,220,255,0.6); box-shadow:0 0 16px rgba(61,220,255,0.35); }
+/* expanding ring pulse on tap, triggered by JS adding .pulsing briefly */
+.dock-btn::after{ content:''; position:absolute; inset:0; border-radius:50%; margin:auto; width:4px; height:4px;
+  background:rgba(61,220,255,0.6); opacity:0; }
+.dock-btn.pulsing::after{ animation:dockPulse 0.5s ease-out; }
+@keyframes dockPulse{ 0%{ opacity:0.8; width:4px; height:4px; } 100%{ opacity:0; width:160px; height:160px; } }
+
+/* ===================== TELEMETRY DASHBOARD ===================== */
+.telemetry-row{ display:flex; gap:8px; margin-top:10px; }
+.tele-card{ flex:1; border:1px solid var(--panel-border); background:rgba(6,14,26,0.45);
+  clip-path:polygon(0 0,92% 0,100% 30%,100% 100%,0 100%); padding:7px 9px; display:flex; flex-direction:column; gap:5px; }
+.tele-label{ font-family:'JetBrains Mono',monospace; font-size:7.5px; letter-spacing:1.5px; color:rgba(124,147,168,0.7); }
+.tele-val{ font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--cyan); letter-spacing:0.5px; }
+
+.tele-bars{ display:flex; align-items:flex-end; gap:2px; height:12px; }
+.tele-bars span{ width:3px; background:var(--cyan); opacity:0.75; border-radius:1px; animation:teleBar 1.8s ease-in-out infinite; }
+.tele-bars span:nth-child(1){ height:40%; animation-delay:0s; }
+.tele-bars span:nth-child(2){ height:75%; animation-delay:0.2s; }
+.tele-bars span:nth-child(3){ height:55%; animation-delay:0.4s; }
+.tele-bars span:nth-child(4){ height:90%; animation-delay:0.6s; }
+.tele-bars span:nth-child(5){ height:60%; animation-delay:0.8s; }
+@keyframes teleBar{ 0%,100%{ opacity:0.5; } 50%{ opacity:1; } }
+
+.tele-ring{ width:16px; height:16px; border-radius:50%;
+  background:conic-gradient(var(--cyan) calc(var(--pct,98) * 1%), rgba(61,220,255,0.15) 0);
+  -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 2.5px));
+  mask:radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 2.5px)); }
+
+.warn-banner{ display:none; background:rgba(255,107,74,0.12); border:1px solid rgba(255,107,74,0.4);
+  clip-path:polygon(2% 0,98% 0,100% 30%,100% 100%,0 100%,0 30%);
+  padding:10px 14px; margin:10px 2px 0; font-size:11px; line-height:1.5; color:#FFB199; }
+.warn-banner.show{ display:block; }
+
+/* ===================== ORB — wireframe holographic iris ===================== */
+.orb-zone{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; min-height:0; }
+.orb-wrap{ position:relative; width:250px; height:250px; display:flex; align-items:center; justify-content:center; }
+
+/* targeting reticle — four short ticks at N/E/S/W, movie-HUD signature */
+.reticle{ position:absolute; background:rgba(61,220,255,0.65); }
+.rt-n{ top:-4px; left:50%; width:1px; height:14px; margin-left:-0.5px; }
+.rt-s{ bottom:-4px; left:50%; width:1px; height:14px; margin-left:-0.5px; }
+.rt-e{ right:-4px; top:50%; width:14px; height:1px; margin-top:-0.5px; }
+.rt-w{ left:-4px; top:50%; width:14px; height:1px; margin-top:-0.5px; }
+
+.dial-ticks{ position:absolute; inset:0; border-radius:50%; }
+.dial-ticks::before{ content:''; position:absolute; inset:0; border-radius:50%;
+  background:repeating-conic-gradient(rgba(61,220,255,0.45) 0deg 1deg, transparent 1deg 9deg);
+  mask:radial-gradient(farthest-side, transparent calc(100% - 9px), black calc(100% - 8px));
+  -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 9px), black calc(100% - 8px));
+  animation:spin 40s linear infinite; }
+
+.ring{ position:absolute; border-radius:50%; border:1px solid rgba(61,220,255,0.2); }
+.ring1{ width:222px; height:222px; border-style:dashed; animation:spin 22s linear infinite; }
+.ring2{ width:182px; height:182px; border-color:rgba(61,220,255,0.28); animation:spin 16s linear infinite reverse; }
+.ring3{ width:148px; height:148px; border-color:rgba(61,220,255,0.35); animation:spin 9s linear infinite; }
+@keyframes spin{ from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+
+.particle-orbit{ position:absolute; inset:0; animation:spin 7s linear infinite; }
+.particle-orbit span{ position:absolute; top:0; left:50%; width:3px; height:3px; margin-left:-1.5px; border-radius:50%;
+  background:var(--cyan); box-shadow:0 0 8px var(--cyan); }
+.particle-orbit.p2{ animation-duration:11s; animation-direction:reverse; }
+.particle-orbit.p2 span{ top:12px; }
+
+/* the orb core is now a hollow wireframe iris — no solid glowing blob,
+   thin concentric rings that counter-rotate like a camera aperture, with a
+   single small bright nucleus at the center. This is the movie-accurate look. */
+.orb-core{ position:relative; width:104px; height:104px; border-radius:50%; z-index:2;
+  border:1px solid rgba(61,220,255,0.7);
+  box-shadow:0 0 22px rgba(61,220,255,0.35), inset 0 0 18px rgba(61,220,255,0.12);
+  background:rgba(6,14,26,0.35);
+  display:flex; align-items:center; justify-content:center;
+  transition:box-shadow 0.4s ease, transform 0.15s ease; }
+
+.iris-ring{ position:absolute; border-radius:50%; border:1px solid rgba(61,220,255,0.4); }
+.iris1{ inset:14px; animation:spin 6s linear infinite; border-style:dashed; }
+.iris2{ inset:28px; animation:spin 4.5s linear infinite reverse; border-color:rgba(61,220,255,0.55); }
+
+.nucleus{ position:absolute; width:9px; height:9px; border-radius:50%; background:#EAFBFF;
+  box-shadow:0 0 12px 3px rgba(61,220,255,0.9); animation:nucleusPulse 2.4s ease-in-out infinite; }
+@keyframes nucleusPulse{ 0%,100%{ opacity:0.75; transform:scale(1); } 50%{ opacity:1; transform:scale(1.25); } }
+
+.wave-bars{ position:absolute; display:flex; align-items:center; justify-content:center; gap:3.5px; height:24px; opacity:0; transition:opacity 0.25s ease; }
+.wave-bars span{ width:2.5px; height:6px; border-radius:1px; background:var(--cyan); box-shadow:0 0 6px rgba(61,220,255,0.8); animation:waveIdle 2.2s ease-in-out infinite; }
+.wave-bars span:nth-child(1){ animation-delay:0s; } .wave-bars span:nth-child(2){ animation-delay:0.12s; }
+.wave-bars span:nth-child(3){ animation-delay:0.24s; } .wave-bars span:nth-child(4){ animation-delay:0.36s; }
+.wave-bars span:nth-child(5){ animation-delay:0.48s; }
+@keyframes waveIdle{ 0%,100%{height:5px;opacity:0.5;} 50%{height:10px;opacity:0.85;} }
+@keyframes waveListen{ 0%,100%{height:5px;} 50%{height:22px;} }
+@keyframes waveProcess{ 0%,100%{height:6px;opacity:0.4;} 50%{height:15px;opacity:1;} }
+@keyframes waveSpeak{ 0%,100%{height:7px;} 50%{height:19px;} }
+
+.orb-wrap.listening .orb-core{ box-shadow:0 0 40px rgba(61,220,255,0.7), inset 0 0 26px rgba(61,220,255,0.25); transform:scale(1.06); }
+.orb-wrap.listening .wave-bars{ opacity:1; }
+.orb-wrap.listening .nucleus{ opacity:0; }
+.orb-wrap.listening .wave-bars span{ animation-name:waveListen; animation-duration:0.55s; }
+.orb-wrap.listening .ring1{ animation-duration:6s; } .orb-wrap.listening .ring2{ animation-duration:4s; }
+.orb-wrap.listening .ring3{ animation-duration:2.2s; border-color:rgba(255,255,255,0.55); }
+.orb-wrap.listening .particle-orbit{ animation-duration:2.5s; }
+.orb-wrap.listening .dial-ticks::before{ animation-duration:8s; }
+.orb-wrap.listening .iris1{ animation-duration:1.6s; } .orb-wrap.listening .iris2{ animation-duration:1.2s; }
+
+.orb-wrap.processing .orb-core{ animation:pulse 1s ease-in-out infinite; }
+.orb-wrap.processing .wave-bars{ opacity:1; }
+.orb-wrap.processing .nucleus{ opacity:0; }
+.orb-wrap.processing .wave-bars span{ animation-name:waveProcess; animation-duration:0.5s; }
+@keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:0.6;} }
+
+.orb-wrap.speaking .wave-bars{ opacity:1; }
+.orb-wrap.speaking .nucleus{ opacity:0; }
+.orb-wrap.speaking .wave-bars span{ animation-name:waveSpeak; animation-duration:0.42s; }
+.orb-wrap.speaking.word-pulse .orb-core{ transform:scale(1.1);
+  box-shadow:0 0 50px rgba(61,220,255,0.85), inset 0 0 30px rgba(61,220,255,0.35); }
+
+.scan-sweep{ position:absolute; inset:0; border-radius:50%; opacity:0; pointer-events:none; }
+
+.hud-tag{ position:absolute; font-family:'JetBrains Mono',monospace; font-size:8.5px; letter-spacing:1.5px;
+  color:rgba(61,220,255,0.55); white-space:nowrap; }
+.tag-tl{ top:-6px; left:-58px; } .tag-br{ bottom:-6px; right:-58px; }
+.orb-wrap.processing .scan-sweep{ opacity:1;
+  background:conic-gradient(from 0deg, transparent 0deg, rgba(76,224,230,0.45) 20deg, transparent 55deg);
+  animation:spin 1.1s linear infinite; }
+
+.state-label{ font-family:'Orbitron',sans-serif; font-size:10.5px; letter-spacing:4.5px; color:var(--text-dim);
+  text-transform:uppercase; min-height:14px; text-align:center; }
+.state-label.active{ color:var(--cyan); text-shadow:0 0 10px rgba(76,224,230,0.6); }
+
+/* ===================== TRANSCRIPT LOG — cut-corner panel ===================== */
+.log-panel{ background:var(--panel); border:1px solid var(--panel-border);
+  clip-path:polygon(3% 0,97% 0,100% 18%,100% 100%,0 100%,0 18%);
+  padding:16px 16px 12px; max-height:26vh; overflow-y:auto; backdrop-filter:blur(12px);
+  font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.6; }
+.log-entry{ margin-bottom:8px; }
+.log-you{ color:var(--text-dim); } .log-jarvis{ color:var(--cyan); }
+.log-empty{ color:var(--text-dim); font-style:italic; opacity:0.6; }
+.log-panel::-webkit-scrollbar{ width:4px; } .log-panel::-webkit-scrollbar-thumb{ background:rgba(76,224,230,0.35); border-radius:2px; }
+
+/* ===================== MODALS ===================== */
+.modal-backdrop{ position:fixed; inset:0; background:rgba(2,3,6,0.82); backdrop-filter:blur(5px);
+  display:none; align-items:center; justify-content:center; z-index:20; }
+.modal-backdrop.show{ display:flex; }
+.modal{ width:min(340px,86vw); max-height:78vh; overflow-y:auto; background:#0A101C;
+  border:1px solid var(--panel-border); clip-path:polygon(4% 0,96% 0,100% 5%,100% 100%,0 100%,0 5%);
+  padding:24px 22px; box-shadow:0 0 40px rgba(76,224,230,0.15); }
+.modal h3{ font-family:'Orbitron',sans-serif; font-size:13px; letter-spacing:2.5px; color:var(--cyan); margin:0 0 14px;
+  text-shadow:0 0 10px rgba(76,224,230,0.5); }
+.modal label{ font-size:12px; color:var(--text-dim); display:block; margin-bottom:6px; }
+.modal input{ width:100%; padding:11px 12px; border-radius:6px; border:1px solid var(--panel-border);
+  background:#050B14; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; margin-bottom:16px; }
+.modal-btns{ display:flex; gap:10px; }
+.modal-btns button{ flex:1; padding:11px; border-radius:6px; border:none; font-family:'Inter',sans-serif;
+  font-weight:600; font-size:13px; letter-spacing:0.5px; }
+.btn-save{ background:linear-gradient(135deg,var(--cyan),var(--violet)); color:#03070c; }
+.btn-cancel{ background:transparent; border:1px solid var(--panel-border)!important; color:var(--text-dim); }
+.hint{ font-size:10.5px; color:var(--text-dim); line-height:1.5; margin-top:-8px; margin-bottom:16px; }
+.history-entry{ font-family:'JetBrains Mono',monospace; font-size:11.5px; line-height:1.6; margin-bottom:10px;
+  padding-bottom:10px; border-bottom:1px solid rgba(76,224,230,0.12); }
+</style>
+</head>
+<body>
+
+<div class="boot-screen" id="bootScreen">
+  <div class="boot-word">J.A.R.V.I.S</div>
+  <div class="boot-bar-track"><div class="boot-bar-fill"></div></div>
+  <div class="boot-status" id="bootStatus">INITIALIZING NEURAL CORE...</div>
+</div>
+
+<div class="grid-overlay"></div>
+<div class="scanline"></div>
+<div class="vignette"></div>
+<div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+
+<div class="app">
+
+  <div class="hud-console">
+    <div class="console-row1">
+      <div class="brand">
+        <div class="wordmark">J.A.R.V.I.S</div>
+        <div class="tagline">PERSONAL AI INTERFACE</div>
+      </div>
+      <div class="status-chip"><span class="status-dot"></span><span id="statusChipText">ONLINE</span></div>
+    </div>
+    <div class="console-divider"></div>
+    <div class="telemetry-row">
+      <div class="tele-card">
+        <span class="tele-label">CORE</span>
+        <div class="tele-bars"><span></span><span></span><span></span><span></span><span></span></div>
+        <span class="tele-val" id="readoutCore">STABLE</span>
+      </div>
+      <div class="tele-card">
+        <span class="tele-label">LINK</span>
+        <div class="tele-bars"><span></span><span></span><span></span><span></span><span></span></div>
+        <span class="tele-val" id="readoutLink">ACTIVE</span>
+      </div>
+      <div class="tele-card">
+        <span class="tele-label">PWR</span>
+        <div class="tele-ring" id="pwrRing" style="--pct:98"></div>
+        <span class="tele-val" id="readoutPwr">98%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="warn-banner" id="warnBanner"></div>
+
+  <div class="orb-zone">
+    <div class="orb-wrap" id="orbWrap">
+      <div class="reticle rt-n"></div><div class="reticle rt-e"></div>
+      <div class="reticle rt-s"></div><div class="reticle rt-w"></div>
+      <div class="hud-tag tag-tl" id="tagTl">SYS.SCAN</div>
+      <div class="hud-tag tag-br" id="tagBr">AUTH.OK</div>
+      <div class="dial-ticks"></div>
+      <div class="ring ring1"></div>
+      <div class="ring ring2"></div>
+      <div class="ring ring3"></div>
+      <div class="particle-orbit p1"><span></span></div>
+      <div class="particle-orbit p2"><span></span></div>
+      <div class="scan-sweep"></div>
+      <div class="orb-core" id="orbCore">
+        <div class="iris-ring iris1"></div>
+        <div class="iris-ring iris2"></div>
+        <div class="wave-bars"><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="nucleus"></div>
+      </div>
+    </div>
+    <div class="state-label" id="stateLabel">TAP TO SPEAK · TAP AGAIN TO STOP</div>
+  </div>
+
+  <div class="log-panel" id="logPanel">
+    <div class="log-entry log-empty" id="logEmptyMsg">No conversation yet. Tap the orb to begin.</div>
+  </div>
+
+  <div class="action-dock">
+    <div class="dock-btn" id="historyBtn"><span class="dock-icon">🕘</span><span class="dock-label">HISTORY</span></div>
+    <div class="dock-btn" id="clearBtn"><span class="dock-icon">🗑</span><span class="dock-label">CLEAR</span></div>
+    <div class="dock-btn" id="gearBtn"><span class="dock-icon">⚙</span><span class="dock-label">CONFIG</span></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <h3>API CONFIGURATION</h3>
+    <label>Gemini API Key (free)</label>
+    <input type="password" id="apiKeyInput" placeholder="AIza...">
+    <div class="hint">Free, no credit card. Get a key at aistudio.google.com → Get API Key. Stored only on this device, tied to this app.</div>
+    <div class="modal-btns">
+      <button class="btn-cancel" id="cancelBtn">Cancel</button>
+      <button class="btn-save" id="saveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="historyBackdrop">
+  <div class="modal">
+    <h3>CONVERSATION HISTORY</h3>
+    <div id="historyList"><div class="hint">No history yet.</div></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" id="historyCloseBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   J.A.R.V.I.S — Futuristic voice assistant
+   Sections: CONFIG · STATE · DOM REFS · UI HELPERS · PERSISTENCE ·
+             SPEECH RECOGNITION · TEXT-TO-SPEECH · AI BRAIN · COMMAND
+             EXECUTION · EVENT WIRING · BOOT SEQUENCE
+   ========================================================================= */
+
+const GEMINI_MODEL = 'gemini-flash-latest'; // alias — Google points this at their current stable free model, so it won't break on renames
+const MAX_VISIBLE_LOG_ENTRIES = 8;
+
+const UNCLEAR_INPUT_PHRASES = [
+  "I'm not receiving a clear signal. Try again, Commander.",
+  "Could you repeat that, Commander?",
+  "Audio input was incomplete. One more time?",
+  "Your voice didn't reach me clearly.",
+  "Signal interference detected. Please try again.",
+  "I caught noise, not words. Say that again?",
+  "Transmission broke up on my end — go ahead again.",
+  "I need a cleaner signal to work with. Try once more."
+];
+
+const APP_LINKS = {
+  youtube:'https://youtube.com', whatsapp:'https://web.whatsapp.com', gmail:'https://mail.google.com',
+  maps:'https://maps.google.com', spotify:'https://open.spotify.com', twitter:'https://x.com',
+  instagram:'https://instagram.com', wikipedia:'https://wikipedia.org'
+};
+
+let apiKey = '';
+let isListening = false;
+let recognition = null;
+let conversationLog = [];
+
+const orbWrap = document.getElementById('orbWrap');
+const stateLabel = document.getElementById('stateLabel');
+const statusChipText = document.getElementById('statusChipText');
+const logPanel = document.getElementById('logPanel');
+const logEmptyMsg = document.getElementById('logEmptyMsg');
+const warnBanner = document.getElementById('warnBanner');
+const modalBackdrop = document.getElementById('modalBackdrop');
+const apiKeyInput = document.getElementById('apiKeyInput');
+const historyBackdrop = document.getElementById('historyBackdrop');
+const historyList = document.getElementById('historyList');
+
+function showWarning(msg){ warnBanner.textContent = msg; warnBanner.classList.add('show'); }
+function randomUnclearPhrase(){ return UNCLEAR_INPUT_PHRASES[Math.floor(Math.random() * UNCLEAR_INPUT_PHRASES.length)]; }
+
+function log(who, text){
+  conversationLog.push({ who, text, ts: Date.now() });
+  saveHistory();
+  renderLivePanel();
+}
+
+function renderLivePanel(){
+  logEmptyMsg.style.display = conversationLog.length ? 'none' : 'block';
+  const recent = conversationLog.slice(-MAX_VISIBLE_LOG_ENTRIES);
+  logPanel.querySelectorAll('.log-entry:not(#logEmptyMsg)').forEach(el => el.remove());
+  recent.forEach(entry => {
+    const div = document.createElement('div');
+    div.className = 'log-entry ' + (entry.who === 'YOU' ? 'log-you' : 'log-jarvis');
+    div.textContent = entry.who + ': ' + entry.text;
+    logPanel.appendChild(div);
+  });
+  logPanel.scrollTop = logPanel.scrollHeight;
+}
+
+function setState(state){
+  stateLabel.classList.toggle('active', state !== 'idle');
+  orbWrap.classList.remove('listening','processing','speaking','word-pulse');
+  const tagTl = document.getElementById('tagTl');
+  const tagBr = document.getElementById('tagBr');
+  if(state === 'listening'){ orbWrap.classList.add('listening'); stateLabel.textContent = 'LISTENING · TAP TO STOP'; statusChipText.textContent = 'LISTENING'; tagTl.textContent='AUD.CAPTURE'; tagBr.textContent='REC ●'; }
+  else if(state === 'processing'){ orbWrap.classList.add('processing'); stateLabel.textContent = 'PROCESSING'; statusChipText.textContent = 'THINKING'; tagTl.textContent='ANALYZING'; tagBr.textContent='NEURAL.LINK'; }
+  else if(state === 'speaking'){ orbWrap.classList.add('speaking'); stateLabel.textContent = 'SPEAKING'; statusChipText.textContent = 'SPEAKING'; tagTl.textContent='SYNTHESIZING'; tagBr.textContent='OUT ●'; }
+  else { stateLabel.textContent = 'TAP TO SPEAK · TAP AGAIN TO STOP'; statusChipText.textContent = 'ONLINE'; tagTl.textContent='SYS.SCAN'; tagBr.textContent='AUTH.OK'; }
+}
+
+function tickReadout(){
+  const pwr = document.getElementById('readoutPwr');
+  const ring = document.getElementById('pwrRing');
+  const val = 94 + Math.floor(Math.random() * 6);
+  pwr.textContent = val + '%';
+  ring.style.setProperty('--pct', val);
+}
+setInterval(tickReadout, 4000);
+
+async function loadPersistedData(){
+  try{
+    const keyResult = await window.storage.get('gemini-api-key');
+    if(keyResult && keyResult.value) apiKey = keyResult.value;
+  }catch(e){}
+  try{
+    const histResult = await window.storage.get('conversation-history');
+    if(histResult && histResult.value) conversationLog = JSON.parse(histResult.value);
+  }catch(e){}
+  renderLivePanel();
+}
+async function saveHistory(){
+  try{ await window.storage.set('conversation-history', JSON.stringify(conversationLog.slice(-200))); }catch(e){}
+}
+async function clearHistory(){
+  conversationLog = [];
+  try{ await window.storage.delete('conversation-history'); }catch(e){}
+  renderLivePanel();
+}
+function openHistoryModal(){
+  historyList.innerHTML = '';
+  if(!conversationLog.length){
+    historyList.innerHTML = '<div class="hint">No history yet.</div>';
+  } else {
+    conversationLog.slice().reverse().forEach(entry => {
+      const div = document.createElement('div');
+      div.className = 'history-entry';
+      const time = new Date(entry.ts).toLocaleString();
+      div.innerHTML = '<strong style="color:' + (entry.who === 'YOU' ? '#7C93A8' : '#4CE0E6') + '">' + entry.who + '</strong> · ' + time + '<br>' + entry.text;
+      historyList.appendChild(div);
+    });
+  }
+  historyBackdrop.classList.add('show');
+}
+
+(function checkEnvironment(){
+  const isEmbeddedWebView = /; ?wv\)/i.test(navigator.userAgent);
+  if (location.protocol === 'file:') {
+    showWarning('⚠ Opened as a local file — the microphone will be blocked. Open this using the https link instead.');
+  } else if (!window.isSecureContext) {
+    showWarning('⚠ This page isn\'t loaded over https, so the microphone will be blocked.');
+  } else if (isEmbeddedWebView) {
+    showWarning('⚠ This looks like an in-app preview browser, which usually blocks the microphone. Tap ⋮ → "Open in Browser" to use voice features.');
+  }
+})();
+
+const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (SpeechRecognitionAPI) {
+  recognition = new SpeechRecognitionAPI();
+  recognition.lang = 'en-US';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.onresult = (event) => {
+    const spoken = event.results[0][0].transcript;
+    if (!spoken || !spoken.trim()) { setState('idle'); log('JARVIS', randomUnclearPhrase()); return; }
+    log('YOU', spoken);
+    setState('processing');
+    askJarvis(spoken);
+  };
+
+  recognition.onerror = (event) => {
+    isListening = false;
+    setState('idle');
+    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+      log('JARVIS', 'Microphone permission was blocked. Allow microphone access for this site in your browser settings.');
+    } else if (event.error === 'audio-capture') {
+      log('JARVIS', 'No microphone was detected on this device.');
+    } else if (event.error === 'network') {
+      log('JARVIS', 'Speech recognition needs an internet connection. Check your connection and try again.');
+    } else {
+      log('JARVIS', randomUnclearPhrase());
+    }
+  };
+
+  recognition.onnomatch = () => { log('JARVIS', randomUnclearPhrase()); };
+  recognition.onend = () => {
+    isListening = false;
+    if (stateLabel.textContent.indexOf('LISTENING') !== -1) setState('idle');
+  };
+} else {
+  showWarning('⚠ Speech recognition isn\'t supported in this browser. Use Chrome on Android.');
+}
+
+function startListening(){
+  if (!recognition) { log('JARVIS', 'Speech recognition is not supported in this browser.'); return; }
+  if (location.protocol === 'file:' || !window.isSecureContext) {
+    log('JARVIS', 'Microphone is blocked on this page — open the https link instead of a downloaded file.');
+    return;
+  }
+  isListening = true;
+  setState('listening');
+  try { recognition.start(); } catch(e){ isListening = false; setState('idle'); }
+}
+function stopListening(){
+  if (recognition && isListening) { try { recognition.stop(); } catch(e){} }
+  isListening = false;
+  setState('idle');
+}
+
+function speak(text){
+  if (!('speechSynthesis' in window)) return;
+  setState('speaking');
+  speechSynthesis.cancel();
+
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.rate = 1.0; utter.pitch = 0.85; utter.lang = 'en-US';
+  const voices = speechSynthesis.getVoices();
+  const preferred = voices.find(v => /male|daniel|david|google uk english male/i.test(v.name));
+  if (preferred) utter.voice = preferred;
+
+  utter.onboundary = () => {
+    orbWrap.classList.add('word-pulse');
+    setTimeout(() => orbWrap.classList.remove('word-pulse'), 160);
+  };
+  utter.onend = () => setState('idle');
+  utter.onerror = () => setState('idle');
+  speechSynthesis.speak(utter);
+}
+
+async function askJarvis(command){
+  if (!apiKey) { modalBackdrop.classList.add('show'); setState('idle'); return; }
+
+  const systemPrompt = `You are JARVIS, a sharp, capable AI assistant with a calm, confident, slightly
+formal tone (address the user as "Commander" occasionally, not every line). You run natively on the
+user's phone and can immediately act on supported commands without asking for confirmation first.
+Reply with ONLY a JSON object, no markdown, no code fences:
+{"action":"reply"|"open_url"|"open_app"|"send_email","speech":"short natural spoken reply, max 2 sentences","url":"full url if open_url","app":"one word app name if open_app: youtube, whatsapp, chrome, gmail, maps, spotify, twitter, instagram, wikipedia","to":"email if send_email","subject":"subject if send_email","body":"body if send_email"}`;
+
+  try {
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + apiKey;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: 'user', parts: [{ text: command }] }],
+        generationConfig: { maxOutputTokens: 400 }
+      })
+    });
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.message || 'API error');
+
+    let raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    raw = raw.replace(/```json|```/g, '').trim();
+    const action = JSON.parse(raw);
+
+    const speech = action.speech || 'Done.';
+    log('JARVIS', speech);
+    speak(speech);
+    executeCommand(action);
+  } catch (err) {
+    setState('idle');
+    log('JARVIS', 'I hit a snag reaching my systems: ' + err.message);
+  }
+}
+
+function executeCommand(action){
+  try{
+    switch(action.action){
+      case 'open_url': if (action.url) openUrl(action.url); break;
+      case 'open_app': if (action.app) openApp(action.app); break;
+      case 'send_email': sendEmailDraft(action.to || '', action.subject || '', action.body || ''); break;
+    }
+  }catch(e){ log('JARVIS', 'That action didn\'t go through, but I\'m still here.'); }
+}
+function openUrl(url){ window.open(url.startsWith('http') ? url : 'https://' + url, '_blank'); }
+function openApp(appName){
+  const link = APP_LINKS[appName.toLowerCase()];
+  if (link) window.open(link, '_blank'); else log('JARVIS', "I don't have a shortcut for that app yet.");
+}
+function sendEmailDraft(to, subject, body){
+  window.location.href = 'mailto:' + encodeURIComponent(to) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+}
+
+orbWrap.addEventListener('click', () => {
+  if (isListening) { stopListening(); return; }
+  if (!apiKey) { modalBackdrop.classList.add('show'); return; }
+  startListening();
+});
+function pulseDock(el){
+  el.classList.remove('pulsing');
+  void el.offsetWidth; // restart animation if tapped rapidly
+  el.classList.add('pulsing');
+}
+
+document.getElementById('gearBtn').addEventListener('click', (e) => { pulseDock(e.currentTarget); apiKeyInput.value = apiKey; modalBackdrop.classList.add('show'); });
+document.getElementById('cancelBtn').addEventListener('click', () => modalBackdrop.classList.remove('show'));
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  apiKey = apiKeyInput.value.trim();
+  try{ await window.storage.set('gemini-api-key', apiKey); }catch(e){}
+  modalBackdrop.classList.remove('show');
+  log('JARVIS', 'API key updated. Ready when you are.');
+});
+document.getElementById('historyBtn').addEventListener('click', (e) => { pulseDock(e.currentTarget); openHistoryModal(); });
+document.getElementById('historyCloseBtn').addEventListener('click', () => historyBackdrop.classList.remove('show'));
+document.getElementById('clearBtn').addEventListener('click', async (e) => { pulseDock(e.currentTarget); await clearHistory(); });
+
+window.addEventListener('pagehide', () => {
+  if (recognition && isListening) { try{ recognition.stop(); }catch(e){} }
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+});
+
+function runBootSequence(){
+  const bootScreen = document.getElementById('bootScreen');
+  const bootStatus = document.getElementById('bootStatus');
+  const messages = ['INITIALIZING NEURAL CORE...', 'CALIBRATING VOICE MATRIX...', 'SYSTEMS ONLINE'];
+  let i = 0;
+  const interval = setInterval(() => {
+    i++;
+    if (i < messages.length) bootStatus.textContent = messages[i];
+    else clearInterval(interval);
+  }, 700);
+  setTimeout(() => bootScreen.classList.add('hidden'), 2200);
+}
+
+runBootSequence();
+loadPersistedData();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
+</script>
+</body>
+</html>
